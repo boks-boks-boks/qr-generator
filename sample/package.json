@@ -7,6 +7,15 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "npx tsc -p '..'; node index.js"
+    "setup": "cd .. && npm link && cd sample && npm link boks-boks-boks-qr-generator",
+    "build": "cd .. && npm run build", 
+    "dev": "npm run setup && npm run build && node index.js",
+    "start": "node index.js"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "canvas": "^2.11.2"
   }
 }

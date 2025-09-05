@@ -6,3 +6,4 @@ node_modules
 *.tsbuildinfo
 
 !sample/*
+sample/node_modules
