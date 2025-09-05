@@ -6,7 +6,7 @@ const server = createServer((req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
         const canvas = createCanvas(300, 300)
         
-        textToCanvas(canvas, "QR Code")
+        textToCanvas(canvas, "QR Code", true)
         
         const dataURL = canvas.toDataURL()
         
@@ -18,7 +18,7 @@ const server = createServer((req, res) => {
             </head>
             <body>
                 <h1>QR Generator Output</h1>
-                <img src="${dataURL}" alt="Generated QR" style="border: 1px solid #ccc;">
+                <img src="${dataURL}" alt="Generated QR">
             </body>
             </html>`
         
