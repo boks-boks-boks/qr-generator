@@ -16,8 +16,9 @@
   },
   "license": "ISC",
   "author": "Vincent Astolfi <https://github.com/viastolfi>",
-  "type": "commonjs",
+  "type": "module",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
