@@ -1,0 +1,27 @@
+{
+  "name": "qr-generator",
+  "version": "1.0.0",
+  "description": "A qr code generator package",
+  "keywords": [
+    "qr",
+    "generator"
+  ],
+  "homepage": "https://github.com/boks-boks-boks/qr-generator#readme",
+  "bugs": {
+    "url": "https://github.com/boks-boks-boks/qr-generator/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/boks-boks-boks/qr-generator.git"
+  },
+  "license": "ISC",
+  "author": "Vincent Astolfi <https://github.com/viastolfi>",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
