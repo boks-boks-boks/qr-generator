@@ -1,11 +1,52 @@
-# QR CODE GENERATOR
+## QR CODE GENERATOR
 
-### How to install
+### How to use
+
+**Node js**
 
 ```bash
-git clone https://github.com/boks-boks-boks/qr-generator
-cd qr-generator
-npm i
-npx tsc
-node index.js
+npm i boks-boks-boks-qr-generator
+```
+
+
+_if you want to send the qr back to the client_
+
+```js
+// index.js
+import { createServer } from 'http'
+import { textToCanvas } from 'boks-boks-boks-qr-generator'
+import { createCanvas } from 'canvas'
+
+const server = createServer((req, res) => {
+    if (req.url === '/' || req.url === '/index.html') {
+        const canvas = createCanvas(300, 300)
+        
+        textToCanvas(canvas, "www.myUrl.com")
+        
+        const dataURL = canvas.toDataURL()
+        
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>QR Generator</title>
+            </head>
+            <body>
+                <h1>QR Generator Output</h1>
+                <img src="${dataURL}" alt="Generated QR">
+            </body>
+            </html>`
+        
+        res.writeHead(200, { 'Content-Type': 'text/html' })
+        res.end(html)
+    } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end('Not Found')
+    }
+})
+
+const port = 8000
+server.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`)
+})
 ```
