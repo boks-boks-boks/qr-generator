@@ -1,0 +1,12 @@
+{
+  "name": "sample",
+  "version": "1.0.0",
+  "description": "Project for boks-boks-boks-qr-generator testing",
+  "license": "ISC",
+  "author": "Vincent Astolfi <github.com/viastolfi>",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npx tsc -p '..'; node index.js"
+  }
+}
