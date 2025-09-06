@@ -93,7 +93,7 @@ function addQrAnchor(
         ctx.fillRect(2 * blockSize, topRightBlockCoords.y + 2 * blockSize, 3 * blockSize, 3 * blockSize)
     }
 
-    // top right corner
+    // top right anchor
     {
         const topRightBlockCoords = {x: (blockNumber - 7) * blockSize, y: 0}
 
@@ -111,5 +111,17 @@ function addQrAnchor(
 
         // center block
         ctx.fillRect(topRightBlockCoords.x + 2 * blockSize, 2 * blockSize, 3 * blockSize, 3 * blockSize)
+    }
+
+    // fix pattern 
+    {
+        const fixBlockNumber = ((blockNumber - 2 * 7) - 1) / 2
+        for(let i = 0; i < fixBlockNumber; ++i) {
+            // top pattern
+            ctx.fillRect((8 + 2 * i) * blockSize, 6 * blockSize, blockSize, blockSize)
+        
+            // left pattern
+            ctx.fillRect(6 * blockSize, (8 + 2 * i) * blockSize, blockSize, blockSize)
+        }
     }
 }
