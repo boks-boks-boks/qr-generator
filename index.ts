@@ -13,6 +13,10 @@ export function textToCanvas(
     const blockNumber = 25 // TODO: compute this
     const blockSize = getBlockSize(canva, blockNumber)
     
+    // For now, we only compute alphanumeric since we use it for static url
+    const alphanumericEncoding = [0, 0, 1, 0] // equivalent for 0b0010 but as a byte array
+    addEncoding(ctx, blockSize, blockNumber, alphanumericEncoding)
+    
     if (isDebugContext)
         addBlockGrid(ctx, blockNumber, blockSize)
 
@@ -124,4 +128,37 @@ function addQrAnchor(
             ctx.fillRect(6 * blockSize, (8 + 2 * i) * blockSize, blockSize, blockSize)
         }
     }
+}
+
+function addEncoding(
+    ctx: CanvasRenderingContext2D, 
+    blockSize: number, 
+    blockNumber: number, 
+    encoding: number[]
+): void {
+    const startX = (blockNumber - 2) * blockSize;
+    const startY = (blockNumber - 2) * blockSize;
+    
+    // 2x2 square corresponding the encoding part of the qr
+    const positions = [
+        { x: 0, y: 0 }, // top-left
+        { x: 1, y: 0 }, // top-right
+        { x: 0, y: 1 }, // bottom-left
+        { x: 1, y: 1 }  // bottom-right
+    ];
+    
+    encoding.forEach((bit, index) => {
+        if (index < positions.length) { 
+            const pos = positions[index];
+            if(!pos) {
+                throw new Error("Error while encoding : unaccessible pos, maybe unknown uncoding type")
+            }
+            const x = startX + pos.x * blockSize;
+            const y = startY + pos.y * blockSize;
+            
+            if (bit === 1) {
+                ctx.fillRect(x, y, blockSize, blockSize);
+            }
+        }
+    });
 }
