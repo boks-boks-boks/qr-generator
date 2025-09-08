@@ -13,8 +13,8 @@ export function textToCanvas(
     const blockNumber = 25 // TODO: compute this
     const blockSize = getBlockSize(canva, blockNumber)
     
-    // For now, we only compute alphanumeric since we use it for static url
-    const alphanumericEncoding = [0, 0, 1, 0] // equivalent for 0b0010 but as a byte array
+    // For now, we only compute bytes since we use it for static url
+    const alphanumericEncoding = [0, 1, 0, 0] // equivalent for 0b0100 but as a byte array
     addEncoding(ctx, blockSize, blockNumber, alphanumericEncoding)
     
     if (isDebugContext)
