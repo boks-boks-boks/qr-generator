@@ -6,7 +6,7 @@ const server = createServer((req, res) => {
     if (req.url === '/' || req.url === '/index.html') {
         const canvas = createCanvas(300, 300)
         
-        textToCanvas(canvas, "QR Code")
+        textToCanvas(canvas, "http://localhost:5173/box/0e654138-8204-4e47-8c25-1a974f7455e8/items", {errorCorrectionLevel: 'M'})
         
         const dataURL = canvas.toDataURL()
         

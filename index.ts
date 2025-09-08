@@ -1,7 +1,70 @@
+// QR Code capacity computation based on ISO/IEC 18004 standard
+// Sources:
+// - https://www.qrcode.com/en/about/version.html
+// - ISO/IEC 18004:2015 Information technology — Automatic identification and data capture techniques — QR Code bar code symbology specification
+// - https://en.wikipedia.org/wiki/QR_code
+
+function calculateModules(version: number): number {
+    return 21 + 4 * (version - 1);
+}
+
+const DATA_CODEWORDS = {
+    // [L, M, Q, H] error correction levels
+    1: [19, 16, 13, 9],
+    2: [34, 28, 22, 16],
+    3: [55, 44, 34, 26],
+    4: [80, 64, 48, 36],
+    5: [108, 86, 62, 46],
+    6: [136, 108, 76, 60],
+    7: [156, 124, 88, 66],
+    8: [194, 154, 110, 86],
+    9: [232, 182, 132, 100],
+    10: [274, 216, 154, 122]
+} as const;
+
+function calculateByteCapacity(version: number, errorCorrectionIndex: number): number {
+    const codewords = DATA_CODEWORDS[version as keyof typeof DATA_CODEWORDS];
+    if (!codewords) {
+        throw new Error(`Unsupported QR version: ${version}`);
+    }
+    const capacity = codewords[errorCorrectionIndex];
+    if (capacity === undefined) {
+        throw new Error(`Invalid error correction index: ${errorCorrectionIndex}`);
+    }
+    return capacity;
+}
+
+function generateQRConfig() {
+    const config: Record<string, { module: number; binary: Record<string, number> }> = {};
+    const errorLevels = ['L', 'M', 'Q', 'H'];
+    
+    for (let version = 1; version <= 10; version++) {
+        const modules = calculateModules(version);
+        const binary: Record<string, number> = {};
+        
+        errorLevels.forEach((level, index) => {
+            binary[level] = calculateByteCapacity(version, index);
+        });
+        
+        config[`v${version}`] = {
+            module: modules,
+            binary
+        };
+    }
+    
+    return config;
+}
+
+const qrConfigMatrix = generateQRConfig();
+
 export function textToCanvas(
     canva: HTMLCanvasElement, 
     text: string, 
-    isDebugContext: boolean = false
+    config: {
+        isDebugContext?: boolean,
+        encodingType?: string,
+        errorCorrectionLevel?: string
+    } = {}
 ): void {
     let ctx: CanvasRenderingContext2D | null = canva.getContext("2d")
 
@@ -9,9 +72,22 @@ export function textToCanvas(
         throw new Error("Error getting canva context")
     }
 
-    // admiting this is a v2 qr code
-    const blockNumber = 25 // TODO: compute this
+    const { 
+        isDebugContext = false, 
+        encodingType = 'binary', 
+        errorCorrectionLevel = 'L' 
+    } = config;
+
+    console.debug("Encoding type: ", encodingType)
+    console.debug("Error Correction Level: ", errorCorrectionLevel)
+
+    const textLen = text.length
+
+    const blockNumber = findBestConfig(textLen, encodingType, errorCorrectionLevel)
     const blockSize = getBlockSize(canva, blockNumber)
+    
+    console.debug("textLen: ", textLen)
+    console.debug("blockNumber: ", blockNumber)
     
     // For now, we only compute bytes since we use it for static url
     const alphanumericEncoding = [0, 1, 0, 0] // equivalent for 0b0100 but as a byte array
@@ -161,4 +237,41 @@ function addEncoding(
             }
         }
     });
+}
+
+function findBestConfig(
+    textLength: number,
+    encodingType: string,
+    errorCorrectionLevel: string
+): number {
+    // Define valid encoding types and error correction levels
+    type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
+    
+    // Validate inputs
+    // We currently only handle binary encoding type
+    if (encodingType !== 'binary') {
+        throw new Error(`Unsupported encoding type: ${encodingType}`);
+    }
+    
+    if (!['L', 'M', 'Q', 'H'].includes(errorCorrectionLevel)) {
+        throw new Error(`Unsupported error correction level: ${errorCorrectionLevel}`);
+    }
+    
+    const ecLevel = errorCorrectionLevel as ErrorCorrectionLevel;
+    
+    // Iterate through all available versions to find the best fit
+    for (let version = 1; version <= 10; version++) {
+        const versionKey = `v${version}`;
+        const versionConfig = qrConfigMatrix[versionKey];
+        
+        if (versionConfig && versionConfig.binary[ecLevel]) {
+            const capacity = versionConfig.binary[ecLevel];
+            if (textLength <= capacity) {
+                return versionConfig.module;
+            }
+        }
+    }
+
+    // If text is too long for our supported versions
+    throw new Error(`Text too long (${textLength} chars) for ${encodingType} encoding with ${errorCorrectionLevel} error correction.`);
 }
