@@ -4,6 +4,12 @@
 // - ISO/IEC 18004:2015 Information technology — Automatic identification and data capture techniques — QR Code bar code symbology specification
 // - https://en.wikipedia.org/wiki/QR_code
 
+interface VersionConfig {
+    version: string,
+    module: number,
+    errorCorrectionLevel: Record<string, number>
+}
+
 function calculateModules(version: number): number {
     return 21 + 4 * (version - 1);
 }
@@ -83,20 +89,21 @@ export function textToCanvas(
 
     const textLen = text.length
 
-    const blockNumber = findBestConfig(textLen, encodingType, errorCorrectionLevel)
-    const blockSize = getBlockSize(canva, blockNumber)
+    const versionConfig: VersionConfig = findBestConfig(textLen, encodingType, errorCorrectionLevel)
+    const blockSize = getBlockSize(canva, versionConfig.module)
     
     console.debug("textLen: ", textLen)
-    console.debug("blockNumber: ", blockNumber)
+    console.debug("blockNumber: ", versionConfig.module)
     
     // For now, we only compute bytes since we use it for static url
-    const alphanumericEncoding = [0, 1, 0, 0] // equivalent for 0b0100 but as a byte array
-    addEncoding(ctx, blockSize, blockNumber, alphanumericEncoding)
+    const bytesEncoding = [0, 1, 0, 0] // equivalent for 0b0100 but as a byte array
+    addEncoding(ctx, blockSize, versionConfig.module, bytesEncoding)
     
     if (isDebugContext)
-        addBlockGrid(ctx, blockNumber, blockSize)
+        addBlockGrid(ctx, versionConfig.module, blockSize)
 
-    addQrAnchor(ctx, blockNumber, blockSize)
+    addQrAnchor(ctx, versionConfig.module, blockSize)
+    addAlignementPattern(ctx, blockSize, versionConfig)
 }
 
 function getBlockSize(
@@ -206,6 +213,64 @@ function addQrAnchor(
     }
 }
 
+// Coming from https://gcore.jsdelivr.net/gh/tonycrane/tonycrane.github.io/p/409d352d/ISO_IEC18004-2015.pdf Annex E
+function addAlignementPattern(
+    ctx: CanvasRenderingContext2D,
+    blockSize: number,
+    config: VersionConfig
+): void {
+    type VersionKey = 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9' | 'v10'
+    // May be compute but still relevant if done like so
+    const alignments = {
+        v1: [0],
+        v2: [6, 18],
+        v3: [6, 22],
+        v4: [6, 26],
+        v5: [6, 30],
+        v6: [6, 34],
+        v7: [6, 22, 38],
+        v8: [6, 24, 42],
+        v9: [6, 26, 46],
+        v10: [6, 28, 50]
+    }
+
+    const isCoordinateForbiden = (module: number, coords: {x: number, y: number}): boolean => {
+        if ((coords.x <= 8 && coords.y <= 8) || 
+            (coords.x >= module - 8 && coords.y <= 8) ||
+            (coords.x <= 8 && coords.y >= module - 8)
+        ){
+            console.debug(coords)
+            return true
+        }
+
+        return false
+    }
+
+    const acVers = config.version as VersionKey
+
+    const neededAlignement = alignments[acVers]
+
+    if (neededAlignement.length == 0) return
+
+    const len = neededAlignement.length
+    neededAlignement.forEach((v, index) => {
+        let alreadySeens: Array<{x: number, y: number}> = []
+        for (let i = 0; i < len; ++i) {
+            //console.debug("v: ", v, " y : ", neededAlignement[i])
+            let entry: {x: number, y: number} = {x: v, y: neededAlignement[i]!}
+            if (!alreadySeens.some(seen => seen.x === entry.x && seen.y === entry.y) && !isCoordinateForbiden(config.module, entry)) {
+                console.debug("entry: ", entry)
+                ctx.fillRect((entry.x - 2) * blockSize, (entry.y - 2) * blockSize, 5 * blockSize, blockSize)
+                ctx.fillRect((entry.x - 2) * blockSize, (entry.y - 2) * blockSize, blockSize, 5 * blockSize)
+                ctx.fillRect((entry.x + 2) * blockSize, (entry.y - 2) * blockSize, blockSize, 5 * blockSize)
+                ctx.fillRect((entry.x - 2) * blockSize, (entry.y + 2) * blockSize, 5 * blockSize, blockSize)
+                ctx.fillRect(entry.x * blockSize, entry.y * blockSize, blockSize, blockSize)
+                alreadySeens.push(entry)
+            }
+        }
+    })
+}
+
 function addEncoding(
     ctx: CanvasRenderingContext2D, 
     blockSize: number, 
@@ -243,7 +308,7 @@ function findBestConfig(
     textLength: number,
     encodingType: string,
     errorCorrectionLevel: string
-): number {
+): VersionConfig {
     // Define valid encoding types and error correction levels
     type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
     
@@ -267,7 +332,11 @@ function findBestConfig(
         if (versionConfig && versionConfig.binary[ecLevel]) {
             const capacity = versionConfig.binary[ecLevel];
             if (textLength <= capacity) {
-                return versionConfig.module;
+                return {
+                    version: versionKey, 
+                    module: versionConfig.module,
+                    errorCorrectionLevel: versionConfig.binary
+                };
             }
         }
     }
