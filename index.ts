@@ -51,6 +51,30 @@ const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
         },
         alignmentPositions: [6, 18]
     },
+    3: {
+        version: 3,
+        module: 29,
+        totalCodewords: 70,
+        errorCorrection: {
+            L: { dataCodewords: 55, ecCodewords: 15, blocks: 1, dataPerBlock: 55, ecPerBlock: 15 },
+            M: { dataCodewords: 44, ecCodewords: 26, blocks: 1, dataPerBlock: 44, ecPerBlock: 26 },
+            Q: { dataCodewords: 34, ecCodewords: 36, blocks: 2, dataPerBlock: 17, ecPerBlock: 18 },
+            H: { dataCodewords: 26, ecCodewords: 44, blocks: 2, dataPerBlock: 13, ecPerBlock: 22 }
+        },
+        alignmentPositions: [6, 22]
+    },
+    4: {
+        version: 4,
+        module: 33,
+        totalCodewords: 100,
+        errorCorrection: {
+            L: { dataCodewords: 80, ecCodewords: 20, blocks: 1, dataPerBlock: 80, ecPerBlock: 20 },
+            M: { dataCodewords: 64, ecCodewords: 36, blocks: 2, dataPerBlock: 32, ecPerBlock: 18 },
+            Q: { dataCodewords: 48, ecCodewords: 52, blocks: 2, dataPerBlock: 24, ecPerBlock: 26 },
+            H: { dataCodewords: 36, ecCodewords: 64, blocks: 4, dataPerBlock: 9, ecPerBlock: 16 }
+        },
+        alignmentPositions: [6, 26]
+    },
     5: {
         version: 5,
         module: 37,
@@ -156,8 +180,7 @@ export function textToCanvas(
     const versionConfig: VersionConfig = findBestConfig(textLen, encodingType, errorCorrectionLevel)
     const blockSize = getBlockSize(canva, versionConfig.module)
     
-    console.debug("textLen: ", textLen)
-    console.debug("blockNumber: ", versionConfig.module)
+    console.debug(versionConfig)
     
     // For now, we only compute bytes since we use it for static url
     const bytesEncoding = [0, 1, 0, 0] // equivalent for 0b0100 but as a byte array
