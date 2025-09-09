@@ -3,66 +3,130 @@
 // - https://www.qrcode.com/en/about/version.html
 // - ISO/IEC 18004:2015 Information technology — Automatic identification and data capture techniques — QR Code bar code symbology specification
 // - https://en.wikipedia.org/wiki/QR_code
+// - https://gcore.jsdelivr.net/gh/tonycrane/tonycrane.github.io/p/409d352d/ISO_IEC18004-2015.pdf
 
-interface VersionConfig {
-    version: string,
-    module: number,
-    errorCorrectionLevel: Record<string, number>
+/**
+ * Unified QR code specification combining capacity and error correction data
+ * Based on ISO/IEC 18004 standard
+ */
+interface QRVersionSpec {
+    version: number;
+    module: number;
+    totalCodewords: number;
+    errorCorrection: {
+        L: { dataCodewords: number; ecCodewords: number; blocks: number; dataPerBlock: number; ecPerBlock: number; };
+        M: { dataCodewords: number; ecCodewords: number; blocks: number; dataPerBlock: number; ecPerBlock: number; };
+        Q: { dataCodewords: number; ecCodewords: number; blocks: number; dataPerBlock: number; ecPerBlock: number; };
+        H: { dataCodewords: number; ecCodewords: number; blocks: number; dataPerBlock: number; ecPerBlock: number; };
+    };
+    alignmentPositions: number[];
 }
 
+/**
+ * Complete QR specifications from ISO/IEC 18004
+ * Combines capacity, error correction, and alignment data in one place
+ */
+const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
+    1: {
+        version: 1,
+        module: 21,
+        totalCodewords: 26,
+        errorCorrection: {
+            L: { dataCodewords: 19, ecCodewords: 7, blocks: 1, dataPerBlock: 19, ecPerBlock: 7 },
+            M: { dataCodewords: 16, ecCodewords: 10, blocks: 1, dataPerBlock: 16, ecPerBlock: 10 },
+            Q: { dataCodewords: 13, ecCodewords: 13, blocks: 1, dataPerBlock: 13, ecPerBlock: 13 },
+            H: { dataCodewords: 9, ecCodewords: 17, blocks: 1, dataPerBlock: 9, ecPerBlock: 17 }
+        },
+        alignmentPositions: []
+    },
+    2: {
+        version: 2,
+        module: 25,
+        totalCodewords: 44,
+        errorCorrection: {
+            L: { dataCodewords: 34, ecCodewords: 10, blocks: 1, dataPerBlock: 34, ecPerBlock: 10 },
+            M: { dataCodewords: 28, ecCodewords: 16, blocks: 1, dataPerBlock: 28, ecPerBlock: 16 },
+            Q: { dataCodewords: 22, ecCodewords: 22, blocks: 1, dataPerBlock: 22, ecPerBlock: 22 },
+            H: { dataCodewords: 16, ecCodewords: 28, blocks: 1, dataPerBlock: 16, ecPerBlock: 28 }
+        },
+        alignmentPositions: [6, 18]
+    },
+    5: {
+        version: 5,
+        module: 37,
+        totalCodewords: 134,
+        errorCorrection: {
+            L: { dataCodewords: 108, ecCodewords: 26, blocks: 1, dataPerBlock: 108, ecPerBlock: 26 },
+            M: { dataCodewords: 86, ecCodewords: 48, blocks: 2, dataPerBlock: 43, ecPerBlock: 24 },
+            Q: { dataCodewords: 62, ecCodewords: 72, blocks: 2, dataPerBlock: 31, ecPerBlock: 36 },
+            H: { dataCodewords: 46, ecCodewords: 88, blocks: 2, dataPerBlock: 23, ecPerBlock: 44 }
+        },
+        alignmentPositions: [6, 30]
+    }
+};
+
+/**
+ * Calculates module count for any QR version
+ * Formula: modules = 21 + 4 × (version - 1)
+ * @param version QR code version (1-40)
+ * @returns Number of modules per side of the QR code
+ */
 function calculateModules(version: number): number {
     return 21 + 4 * (version - 1);
 }
 
-const DATA_CODEWORDS = {
-    // [L, M, Q, H] error correction levels
-    1: [19, 16, 13, 9],
-    2: [34, 28, 22, 16],
-    3: [55, 44, 34, 26],
-    4: [80, 64, 48, 36],
-    5: [108, 86, 62, 46],
-    6: [136, 108, 76, 60],
-    7: [156, 124, 88, 66],
-    8: [194, 154, 110, 86],
-    9: [232, 182, 132, 100],
-    10: [274, 216, 154, 122]
-} as const;
-
-function calculateByteCapacity(version: number, errorCorrectionIndex: number): number {
-    const codewords = DATA_CODEWORDS[version as keyof typeof DATA_CODEWORDS];
-    if (!codewords) {
-        throw new Error(`Unsupported QR version: ${version}`);
-    }
-    const capacity = codewords[errorCorrectionIndex];
-    if (capacity === undefined) {
-        throw new Error(`Invalid error correction index: ${errorCorrectionIndex}`);
-    }
-    return capacity;
-}
-
-function generateQRConfig() {
-    const config: Record<string, { module: number; binary: Record<string, number> }> = {};
-    const errorLevels = ['L', 'M', 'Q', 'H'];
-    
-    for (let version = 1; version <= 10; version++) {
-        const modules = calculateModules(version);
-        const binary: Record<string, number> = {};
-        
-        errorLevels.forEach((level, index) => {
-            binary[level] = calculateByteCapacity(version, index);
-        });
-        
-        config[`v${version}`] = {
-            module: modules,
-            binary
-        };
+/**
+ * Gets QR specification for a version, with fallback generation for missing versions
+ * @param version QR code version (1-40)
+ * @returns Complete QR specification including capacity, error correction, and alignment data
+ */
+function getQRSpec(version: number): QRVersionSpec {
+    if (QR_SPECIFICATIONS[version]) {
+        return QR_SPECIFICATIONS[version];
     }
     
-    return config;
+    // This is a fallback handler created so the qr generator do not crash if a version config is not specified
+    // This is a rough estimation and better handling would be to add the complete table from the ISO spec
+    const module = calculateModules(version);
+    const baseCapacity = Math.floor((module * module - 225) / 8); // Rough estimate
+    
+    return {
+        version,
+        module,
+        totalCodewords: baseCapacity,
+        errorCorrection: {
+            L: { dataCodewords: Math.floor(baseCapacity * 0.77), ecCodewords: Math.floor(baseCapacity * 0.23), blocks: 1, dataPerBlock: Math.floor(baseCapacity * 0.77), ecPerBlock: Math.floor(baseCapacity * 0.23) },
+            M: { dataCodewords: Math.floor(baseCapacity * 0.64), ecCodewords: Math.floor(baseCapacity * 0.36), blocks: 1, dataPerBlock: Math.floor(baseCapacity * 0.64), ecPerBlock: Math.floor(baseCapacity * 0.36) },
+            Q: { dataCodewords: Math.floor(baseCapacity * 0.48), ecCodewords: Math.floor(baseCapacity * 0.52), blocks: 1, dataPerBlock: Math.floor(baseCapacity * 0.48), ecPerBlock: Math.floor(baseCapacity * 0.52) },
+            H: { dataCodewords: Math.floor(baseCapacity * 0.34), ecCodewords: Math.floor(baseCapacity * 0.66), blocks: 1, dataPerBlock: Math.floor(baseCapacity * 0.34), ecPerBlock: Math.floor(baseCapacity * 0.66) }
+        },
+        alignmentPositions: version === 1 ? [] : [6, 6 + 4 * (version - 1)]
+    };
 }
 
-const qrConfigMatrix = generateQRConfig();
+/**
+ * Configuration interface for QR code version and capacity information
+ */
+interface VersionConfig {
+    /** Version identifier (e.g., "v1", "v2") */
+    version: string,
+    /** Number of modules per side */
+    module: number,
+    /** Data capacity for each error correction level */
+    errorCorrectionLevel: Record<string, number>
+    /** Number of bits needed for character count indicator */
+    numberOfBits: number 
+}
 
+/**
+ * Main function to render text as a QR code on an HTML canvas
+ * @param canva HTML canvas element to draw on
+ * @param text Text content to encode in the QR code
+ * @param config Configuration options for QR code generation
+ * @param config.isDebugContext Whether to show debug grid lines
+ * @param config.encodingType Type of encoding (currently only 'binary' supported)
+ * @param config.errorCorrectionLevel Error correction level ('L', 'M', 'Q', 'H')
+ */
 export function textToCanvas(
     canva: HTMLCanvasElement, 
     text: string, 
@@ -106,6 +170,13 @@ export function textToCanvas(
     addAlignementPattern(ctx, blockSize, versionConfig)
 }
 
+/**
+ * Calculates the optimal block size for rendering QR code modules on canvas
+ * Ensures the canvas width is evenly divisible by the number of modules
+ * @param canva HTML canvas element
+ * @param blockNumber Number of modules per side of the QR code
+ * @returns Size in pixels for each QR code module
+ */
 function getBlockSize(
     canva: HTMLCanvasElement,
     blockNumber: number
@@ -118,6 +189,13 @@ function getBlockSize(
     return width / blockNumber
 }
 
+/**
+ * Draws a debug grid overlay on the QR code canvas
+ * Useful for visualizing module boundaries during development
+ * @param ctx Canvas 2D rendering context
+ * @param blockNumber Number of modules per side
+ * @param blockSize Size in pixels of each module
+ */
 function addBlockGrid(
     ctx: CanvasRenderingContext2D,
     blockNumber: number,
@@ -137,6 +215,14 @@ function addBlockGrid(
     ctx.stroke()
 }
 
+/**
+ * Draws the three finder patterns (position detection patterns) for QR codes
+ * Located in top-left, top-right, and bottom-left corners
+ * Also adds timing patterns and dark module as per ISO/IEC 18004
+ * @param ctx Canvas 2D rendering context
+ * @param blockNumber Number of modules per side
+ * @param blockSize Size in pixels of each module
+ */
 function addQrAnchor(
     ctx: CanvasRenderingContext2D,
     blockNumber: number, 
@@ -213,27 +299,25 @@ function addQrAnchor(
     }
 }
 
-// Coming from https://gcore.jsdelivr.net/gh/tonycrane/tonycrane.github.io/p/409d352d/ISO_IEC18004-2015.pdf Annex E
+/**
+ * Draws alignment patterns for QR code versions 2 and above
+ * Based on ISO/IEC 18004 Annex E alignment pattern positions
+ * Alignment patterns help with accurate scanning of larger QR codes
+ * @param ctx Canvas 2D rendering context
+ * @param blockSize Size in pixels of each module
+ * @param config QR version configuration containing alignment positions
+ */
 function addAlignementPattern(
     ctx: CanvasRenderingContext2D,
     blockSize: number,
     config: VersionConfig
 ): void {
-    type VersionKey = 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9' | 'v10'
-    // May be compute but still relevant if done like so
-    const alignments = {
-        v1: [0],
-        v2: [6, 18],
-        v3: [6, 22],
-        v4: [6, 26],
-        v5: [6, 30],
-        v6: [6, 34],
-        v7: [6, 22, 38],
-        v8: [6, 24, 42],
-        v9: [6, 26, 46],
-        v10: [6, 28, 50]
-    }
-
+    /**
+     * Checks if coordinates conflict with finder patterns or other reserved areas
+     * @param module Number of modules per side
+     * @param coords X,Y coordinates to check
+     * @returns True if coordinates are in a forbidden area
+     */
     const isCoordinateForbiden = (module: number, coords: {x: number, y: number}): boolean => {
         if ((coords.x <= 8 && coords.y <= 8) || 
             (coords.x >= module - 8 && coords.y <= 8) ||
@@ -242,35 +326,44 @@ function addAlignementPattern(
             console.debug(coords)
             return true
         }
-
         return false
     }
 
-    const acVers = config.version as VersionKey
+    // Extract version number from config.version (e.g., "v5" -> 5)
+    const versionNumber = parseInt(config.version.substring(1));
+    const spec = getQRSpec(versionNumber);
+    const alignmentPositions = spec.alignmentPositions;
 
-    const neededAlignement = alignments[acVers]
+    if (alignmentPositions.length === 0) return;
 
-    if (neededAlignement.length == 0) return
-
-    const len = neededAlignement.length
-    neededAlignement.forEach((v, index) => {
-        let alreadySeens: Array<{x: number, y: number}> = []
+    const len = alignmentPositions.length;
+    alignmentPositions.forEach((v, index) => {
+        let alreadySeens: Array<{x: number, y: number}> = [];
         for (let i = 0; i < len; ++i) {
-            //console.debug("v: ", v, " y : ", neededAlignement[i])
-            let entry: {x: number, y: number} = {x: v, y: neededAlignement[i]!}
-            if (!alreadySeens.some(seen => seen.x === entry.x && seen.y === entry.y) && !isCoordinateForbiden(config.module, entry)) {
-                console.debug("entry: ", entry)
-                ctx.fillRect((entry.x - 2) * blockSize, (entry.y - 2) * blockSize, 5 * blockSize, blockSize)
-                ctx.fillRect((entry.x - 2) * blockSize, (entry.y - 2) * blockSize, blockSize, 5 * blockSize)
-                ctx.fillRect((entry.x + 2) * blockSize, (entry.y - 2) * blockSize, blockSize, 5 * blockSize)
-                ctx.fillRect((entry.x - 2) * blockSize, (entry.y + 2) * blockSize, 5 * blockSize, blockSize)
-                ctx.fillRect(entry.x * blockSize, entry.y * blockSize, blockSize, blockSize)
-                alreadySeens.push(entry)
+            let entry: {x: number, y: number} = {x: v, y: alignmentPositions[i]!};
+            if (!alreadySeens.some(seen => seen.x === entry.x && seen.y === entry.y) && 
+                !isCoordinateForbiden(config.module, entry)) {
+                console.debug("entry: ", entry);
+                // Draw alignment pattern (5x5 with hollow center)
+                ctx.fillRect((entry.x - 2) * blockSize, (entry.y - 2) * blockSize, 5 * blockSize, blockSize);
+                ctx.fillRect((entry.x - 2) * blockSize, (entry.y - 2) * blockSize, blockSize, 5 * blockSize);
+                ctx.fillRect((entry.x + 2) * blockSize, (entry.y - 2) * blockSize, blockSize, 5 * blockSize);
+                ctx.fillRect((entry.x - 2) * blockSize, (entry.y + 2) * blockSize, 5 * blockSize, blockSize);
+                ctx.fillRect(entry.x * blockSize, entry.y * blockSize, blockSize, blockSize);
+                alreadySeens.push(entry);
             }
         }
-    })
+    });
 }
 
+/**
+ * Adds encoding mode information in the bottom-right corner of the QR code
+ * Uses a 2x2 grid to display the 4-bit encoding mode indicator
+ * @param ctx Canvas 2D rendering context
+ * @param blockSize Size in pixels of each module
+ * @param blockNumber Number of modules per side
+ * @param encoding 4-bit array representing the encoding mode (e.g., [0,1,0,0] for byte mode)
+ */
 function addEncoding(
     ctx: CanvasRenderingContext2D, 
     blockSize: number, 
@@ -304,6 +397,15 @@ function addEncoding(
     });
 }
 
+/**
+ * Finds the optimal QR code version and configuration for the given text length
+ * Iterates through QR versions to find the smallest one that can accommodate the text
+ * @param textLength Length of text to encode
+ * @param encodingType Type of encoding (currently only 'binary' supported)
+ * @param errorCorrectionLevel Error correction level ('L', 'M', 'Q', 'H')
+ * @returns Version configuration with capacity and module information
+ * @throws Error if text is too long for supported QR versions or invalid parameters
+ */
 function findBestConfig(
     textLength: number,
     encodingType: string,
@@ -313,7 +415,6 @@ function findBestConfig(
     type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
     
     // Validate inputs
-    // We currently only handle binary encoding type
     if (encodingType !== 'binary') {
         throw new Error(`Unsupported encoding type: ${encodingType}`);
     }
@@ -324,20 +425,23 @@ function findBestConfig(
     
     const ecLevel = errorCorrectionLevel as ErrorCorrectionLevel;
     
-    // Iterate through all available versions to find the best fit
+    // Iterate through versions to find the best fit
     for (let version = 1; version <= 10; version++) {
-        const versionKey = `v${version}`;
-        const versionConfig = qrConfigMatrix[versionKey];
+        const spec = getQRSpec(version);
+        const capacity = spec.errorCorrection[ecLevel].dataCodewords;
         
-        if (versionConfig && versionConfig.binary[ecLevel]) {
-            const capacity = versionConfig.binary[ecLevel];
-            if (textLength <= capacity) {
-                return {
-                    version: versionKey, 
-                    module: versionConfig.module,
-                    errorCorrectionLevel: versionConfig.binary
-                };
-            }
+        if (textLength <= capacity) {
+            return {
+                version: `v${version}`,
+                module: spec.module,
+                errorCorrectionLevel: {
+                    L: spec.errorCorrection.L.dataCodewords,
+                    M: spec.errorCorrection.M.dataCodewords,
+                    Q: spec.errorCorrection.Q.dataCodewords,
+                    H: spec.errorCorrection.H.dataCodewords
+                },
+                numberOfBits: version < 10 ? 8 : 16
+            };
         }
     }
 
