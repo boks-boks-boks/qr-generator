@@ -20,6 +20,8 @@ interface QRVersionSpec {
         H: { dataCodewords: number; ecCodewords: number; blocks: number; dataPerBlock: number; ecPerBlock: number; };
     };
     alignmentPositions: number[];
+    /** Number of bits needed for character count indicator */
+    numberOfBits: number;
 }
 
 /**
@@ -37,7 +39,8 @@ const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
             Q: { dataCodewords: 13, ecCodewords: 13, blocks: 1, dataPerBlock: 13, ecPerBlock: 13 },
             H: { dataCodewords: 9, ecCodewords: 17, blocks: 1, dataPerBlock: 9, ecPerBlock: 17 }
         },
-        alignmentPositions: []
+        alignmentPositions: [],
+        numberOfBits: 8
     },
     2: {
         version: 2,
@@ -49,7 +52,8 @@ const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
             Q: { dataCodewords: 22, ecCodewords: 22, blocks: 1, dataPerBlock: 22, ecPerBlock: 22 },
             H: { dataCodewords: 16, ecCodewords: 28, blocks: 1, dataPerBlock: 16, ecPerBlock: 28 }
         },
-        alignmentPositions: [6, 18]
+        alignmentPositions: [6, 18],
+        numberOfBits: 8
     },
     3: {
         version: 3,
@@ -61,7 +65,8 @@ const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
             Q: { dataCodewords: 34, ecCodewords: 36, blocks: 2, dataPerBlock: 17, ecPerBlock: 18 },
             H: { dataCodewords: 26, ecCodewords: 44, blocks: 2, dataPerBlock: 13, ecPerBlock: 22 }
         },
-        alignmentPositions: [6, 22]
+        alignmentPositions: [6, 22],
+        numberOfBits: 8
     },
     4: {
         version: 4,
@@ -73,7 +78,8 @@ const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
             Q: { dataCodewords: 48, ecCodewords: 52, blocks: 2, dataPerBlock: 24, ecPerBlock: 26 },
             H: { dataCodewords: 36, ecCodewords: 64, blocks: 4, dataPerBlock: 9, ecPerBlock: 16 }
         },
-        alignmentPositions: [6, 26]
+        alignmentPositions: [6, 26],
+        numberOfBits: 8
     },
     5: {
         version: 5,
@@ -85,7 +91,8 @@ const QR_SPECIFICATIONS: Record<number, QRVersionSpec> = {
             Q: { dataCodewords: 62, ecCodewords: 72, blocks: 2, dataPerBlock: 31, ecPerBlock: 36 },
             H: { dataCodewords: 46, ecCodewords: 88, blocks: 2, dataPerBlock: 23, ecPerBlock: 44 }
         },
-        alignmentPositions: [6, 30]
+        alignmentPositions: [6, 30],
+        numberOfBits: 8
     }
 };
 
@@ -124,22 +131,9 @@ function getQRSpec(version: number): QRVersionSpec {
             Q: { dataCodewords: Math.floor(baseCapacity * 0.48), ecCodewords: Math.floor(baseCapacity * 0.52), blocks: 1, dataPerBlock: Math.floor(baseCapacity * 0.48), ecPerBlock: Math.floor(baseCapacity * 0.52) },
             H: { dataCodewords: Math.floor(baseCapacity * 0.34), ecCodewords: Math.floor(baseCapacity * 0.66), blocks: 1, dataPerBlock: Math.floor(baseCapacity * 0.34), ecPerBlock: Math.floor(baseCapacity * 0.66) }
         },
-        alignmentPositions: version === 1 ? [] : [6, 6 + 4 * (version - 1)]
+        alignmentPositions: version === 1 ? [] : [6, 6 + 4 * (version - 1)],
+        numberOfBits: version < 10 ? 8 : 16
     };
-}
-
-/**
- * Configuration interface for QR code version and capacity information
- */
-interface VersionConfig {
-    /** Version identifier (e.g., "v1", "v2") */
-    version: string,
-    /** Number of modules per side */
-    module: number,
-    /** Data capacity for each error correction level */
-    errorCorrectionLevel: Record<string, number>
-    /** Number of bits needed for character count indicator */
-    numberOfBits: number 
 }
 
 /**
@@ -177,20 +171,20 @@ export function textToCanvas(
 
     const textLen = text.length
 
-    const versionConfig: VersionConfig = findBestConfig(textLen, encodingType, errorCorrectionLevel)
-    const blockSize = getBlockSize(canva, versionConfig.module)
+    const versionSpec: QRVersionSpec = findBestConfig(textLen, encodingType, errorCorrectionLevel)
+    const blockSize = getBlockSize(canva, versionSpec.module)
     
-    console.debug(versionConfig)
+    console.debug(versionSpec)
     
     // For now, we only compute bytes since we use it for static url
     const bytesEncoding = [0, 1, 0, 0] // equivalent for 0b0100 but as a byte array
-    addEncoding(ctx, blockSize, versionConfig.module, bytesEncoding)
+    addEncoding(ctx, blockSize, versionSpec.module, bytesEncoding)
     
     if (isDebugContext)
-        addBlockGrid(ctx, versionConfig.module, blockSize)
+        addBlockGrid(ctx, versionSpec.module, blockSize)
 
-    addQrAnchor(ctx, versionConfig.module, blockSize)
-    addAlignementPattern(ctx, blockSize, versionConfig)
+    addQrAnchor(ctx, versionSpec.module, blockSize)
+    addAlignementPattern(ctx, blockSize, versionSpec)
 }
 
 /**
@@ -333,7 +327,7 @@ function addQrAnchor(
 function addAlignementPattern(
     ctx: CanvasRenderingContext2D,
     blockSize: number,
-    config: VersionConfig
+    config: QRVersionSpec
 ): void {
     /**
      * Checks if coordinates conflict with finder patterns or other reserved areas
@@ -352,8 +346,8 @@ function addAlignementPattern(
         return false
     }
 
-    // Extract version number from config.version (e.g., "v5" -> 5)
-    const versionNumber = parseInt(config.version.substring(1));
+    // Extract version number from config.version
+    const versionNumber = config.version;
     const spec = getQRSpec(versionNumber);
     const alignmentPositions = spec.alignmentPositions;
 
@@ -433,7 +427,7 @@ function findBestConfig(
     textLength: number,
     encodingType: string,
     errorCorrectionLevel: string
-): VersionConfig {
+): QRVersionSpec {
     // Define valid encoding types and error correction levels
     type ErrorCorrectionLevel = 'L' | 'M' | 'Q' | 'H';
     
@@ -454,17 +448,7 @@ function findBestConfig(
         const capacity = spec.errorCorrection[ecLevel].dataCodewords;
         
         if (textLength <= capacity) {
-            return {
-                version: `v${version}`,
-                module: spec.module,
-                errorCorrectionLevel: {
-                    L: spec.errorCorrection.L.dataCodewords,
-                    M: spec.errorCorrection.M.dataCodewords,
-                    Q: spec.errorCorrection.Q.dataCodewords,
-                    H: spec.errorCorrection.H.dataCodewords
-                },
-                numberOfBits: version < 10 ? 8 : 16
-            };
+            return spec; // Return the complete QR specification
         }
     }
 
